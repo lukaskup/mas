@@ -1,4 +1,5 @@
 interface IPerson {
+  id: string;
   firstname: string;
   lastname: string;
   phoneNumber: string;
@@ -21,7 +22,7 @@ export interface IClient extends IPerson {
   correspondenceAddress: string;
 }
 
-export interface IPhycialEmployee extends IEmployee {
+export interface IPhysicalEmployee extends IEmployee {
   courses: string[];
 }
 

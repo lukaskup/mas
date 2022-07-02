@@ -1,7 +1,8 @@
 import { IPhysical, IService } from "./product";
 import { IPayment } from "./payment";
+import { IClient } from "./person";
 
-enum OrderStatus {
+export enum OrderStatus {
   inProgress = "INPROGESS",
   ready = "READY",
   completed = "COMPLETED",
@@ -17,4 +18,7 @@ export interface IOrder {
   completedAt: Date;
   payment: IPayment | string;
   products: (IPhysical | IService)[] | string[];
+  client: IClient;
 }
+
+export type OrderFormValues = Omit<IOrder, "id">;

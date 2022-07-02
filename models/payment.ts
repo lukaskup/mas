@@ -1,14 +1,14 @@
 import { IInvoice } from "./invoice";
 import { IOrder } from "./order";
 
-enum PaymentType {
+export enum PaymentType {
   online = "ONLINE",
   cash = "CASH",
 }
 
 export interface IPayment {
   id: string;
-  createdAt: string;
+  createdAt: Date;
   completed: boolean;
   type: PaymentType;
   order?: IOrder;
