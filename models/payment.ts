@@ -12,5 +12,10 @@ export interface IPayment {
   completed: boolean;
   type: PaymentType;
   order?: IOrder;
-  invoices?: IInvoice[];
+  invoice?: IInvoice;
+}
+
+export interface IPaymentFormValues {
+  type: PaymentType;
+  invoiceNipNumber: string;
 }

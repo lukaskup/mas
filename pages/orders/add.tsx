@@ -1,25 +1,34 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import styles from "../../styles/Home.module.css";
 import { OrderFormValues, OrderStatus } from "../../models/order";
-import { Button, Col, Form, Row } from "react-bootstrap";
+import { Button, Col, Form, Modal, Row, Table } from "react-bootstrap";
 import { db } from "../../firebase";
 import Link from "next/link";
+import { PaymentType } from "../../models/payment";
+import { IPhysical, IService } from "../../models/product";
+import { IClient } from "../../models/person";
+import axios from "axios";
 
-const Orders: NextPage = () => {
+const AddOrder: NextPage = () => {
   const [isOrdersLoading, setOrdersLoading] = useState(true);
-  const defaultValues: OrderFormValues = {
-    price: 0,
-    description: "",
-    status: OrderStatus.inProgress,
-    createdAt: new Date(),
-    completedAt: new Date(),
-    payment: "",
-    products: [],
-  };
 
+  const [isInvoice, setIsInvoice] = useState(false);
+  const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
+  const [products, setProducts] = useState<(IPhysical | IService)[]>([]);
+  const [clients, setClients] = useState<IClient[]>([]);
+
+  const defaultValues: OrderFormValues = {
+    description: "",
+    payment: {
+      type: PaymentType.online,
+      invoiceNipNumber: "",
+    },
+    products: [],
+    client: clients[0],
+  };
   const [formValues, setFormValues] = useState(defaultValues);
 
   const handleInputChange = (e: any) => {
@@ -30,26 +39,100 @@ const Orders: NextPage = () => {
     });
   };
 
+  const handlePaymentInfoChange = (e: any) => {
+    const { name, value } = e.target;
+    setFormValues({
+      ...formValues,
+      payment: { ...formValues.payment, [name]: value },
+    });
+  };
+
+  const handleClientChange = (e: any) => {
+    const { value } = e.target;
+    const newClient = clients.find((client) => client.email === value);
+    if (newClient) {
+      setFormValues({
+        ...formValues,
+        client: newClient,
+      });
+    }
+  };
+
+  const handleAddProduct = (product: any) => {
+    if (typeof product.qty !== "undefined") {
+      product.qty = 1;
+    }
+    setFormValues({
+      ...formValues,
+      products: [...formValues.products, product],
+    });
+    setIsProductsModalOpen(false);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    setFormValues({
+      ...formValues,
+      products: formValues.products.filter(
+        (product) => product.id !== productId
+      ),
+    });
+  };
+
+  const handleProductQtyChange = (product: any, qty: number) => {
+    const newProduct: any = formValues.products.find(
+      (formValuesProduct) => formValuesProduct.id === product.id
+    );
+    if (newProduct) {
+      newProduct.qty = qty;
+      const newProducts = formValues.products.filter(
+        (formValuesProduct) => formValuesProduct.id !== product.id
+      );
+      newProducts.push(newProduct);
+      setProducts(newProducts);
+    }
+  };
+
   const handleSubmit = (event: any) => {
     event.preventDefault();
-    console.log(formValues);
+    if (!isInvoice) {
+      delete formValues.payment.invoiceNipNumber;
+    }
+    axios
+      .post("/api/orders", formValues)
+      .then((data) => {
+        console.log("posted");
+      })
+      .catch((e) => console.log(e));
   };
 
   useEffect(() => {
-    const docRef = doc(db, "orders", "test");
-    getDoc(docRef).then((doc) => {
-      console.log(doc.data());
-    });
-  });
+    const productsQuery = query(collection(db, "products"));
+    const clientsQuery = query(collection(db, "persons"), orderBy("email"));
 
-  const toDateInputValue = (date: Date) => {
-    const local = new Date(date);
-    local.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return local.toJSON().slice(0, 10);
-  };
+    Promise.all([getDocs(productsQuery), getDocs(clientsQuery)]).then(
+      (snapshots) => {
+        const productsSnapshot = snapshots[0];
+        const clientsSnapshot = snapshots[1];
+        const dbProducts: (IService | IPhysical)[] = [];
+        productsSnapshot.forEach((doc: any) => {
+          let dbProduct: IService | IPhysical = doc.data();
+          dbProducts.push(dbProduct);
+        });
+        setProducts(dbProducts);
+
+        const dbClients: IClient[] = [];
+        clientsSnapshot.forEach((doc: any) => {
+          let dbClient: IClient = doc.data();
+          dbClients.push(dbClient);
+        });
+        setClients(dbClients);
+        defaultValues.client = dbClients[0];
+      }
+    );
+  }, []);
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ marginTop: "40px" }}>
       <Head>
         <title>Create Next App</title>
         <meta name="description" content="Generated by create next app" />
@@ -71,57 +154,246 @@ const Orders: NextPage = () => {
         </Col>
       </Row>
       <Form>
-        <Form.Group className="mb-4">
-          <Form.Label>Price</Form.Label>
-          <Form.Control type="number" placeholder="Enter price" />
-        </Form.Group>
-        <Form.Group className="mb-4">
-          <Form.Label>Description</Form.Label>
-          <Form.Control type="number" placeholder="Enter description" />
-        </Form.Group>
-        <Form.Group className="mb-4">
-          <Form.Label>Status</Form.Label>
-          <Form.Select placeholder="Enter status">
-            {Object.keys(OrderStatus).map((value: string) => (
-              <option
-                key="value"
-                selected={formValues.status === value.toUpperCase()}
+        <Row>
+          <Col xs={12} md={4}>
+            <Row>
+              <Col>
+                <h2 className="float-start">Order info</h2>
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                <Form.Group className="mb-4">
+                  <Form.Label>Client</Form.Label>
+                  <Form.Select placeholder="=Choose client">
+                    {clients.map((client: IClient) => (
+                      <option
+                        key={`client-${client.id}`}
+                        // defaultValue={formValues.client?.email === client.email}
+                        value={formValues.client?.email}
+                        onChange={handleClientChange}
+                      >
+                        {client.email}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                <Form.Group className="mb-4">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter description"
+                    name="description"
+                    onChange={handleInputChange}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                <h2 className="float-start">Payment info</h2>
+              </Col>
+            </Row>
+            <Form.Group className="mb-4">
+              <Form.Label>Type</Form.Label>
+              <Form.Select
+                placeholder="Enter payment type  "
+                name="type"
+                onChange={handlePaymentInfoChange}
               >
-                {value}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-        <Form.Group className="mb-4">
-          <Form.Label>Created At</Form.Label>
-          <Form.Control
-            type="date"
-            value={toDateInputValue(new Date(formValues.createdAt))}
-          />
-        </Form.Group>
-        <Form.Group className="mb-4">
-          <Form.Label>Completed At</Form.Label>
-          <Form.Control
-            type="date"
-            value={toDateInputValue(new Date(formValues.completedAt))}
-          />
-        </Form.Group>
-        {/* TODO */}
-        <Form.Group className="mb-4">
-          <Form.Label>Payment</Form.Label>
-          <Form.Control type="number" placeholder="Enter Payment" />
-        </Form.Group>
-        {/* TODO */}
-        <Form.Group className="mb-4">
-          <Form.Label>Products</Form.Label>
-          <Form.Control type="number" placeholder="Enter Products" />
-        </Form.Group>
-        <Button variant="primary" type="submit">
+                {Object.keys(PaymentType).map((value: string) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Check
+                type="switch"
+                id="custom-switch"
+                className="mt-3"
+                label="Invoice"
+                checked={isInvoice}
+                onChange={() => setIsInvoice(!isInvoice)}
+              />
+            </Form.Group>
+            {isInvoice && (
+              <Row>
+                <Col>
+                  <Row>
+                    <Col>
+                      <h2 className="float-start">Invoice info</h2>
+                    </Col>
+                  </Row>
+                  <Form.Group className="mb-4">
+                    <Form.Group className="mb-4">
+                      <Form.Label>Nip</Form.Label>
+                      <Form.Control
+                        type="number"
+                        max={11}
+                        placeholder="Enter nip number"
+                        name="invoiceNipNumber"
+                        onChange={handlePaymentInfoChange}
+                        value={formValues.payment.invoiceNipNumber}
+                      />
+                    </Form.Group>
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
+          </Col>
+          <Col>
+            <Row>
+              <Col>
+                <h2 className="float-start">Products list</h2>
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                <Table striped bordered hover>
+                  <thead>
+                    <tr>
+                      <th>name</th>
+                      <th>price</th>
+                      <th>qty/availability</th>
+                      <th>actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formValues.products.map((product: any, i: number) => {
+                      return (
+                        <tr key={`cart-product-${product.id}-${i}`}>
+                          <td>{product.name}</td>
+                          <td>{product.price}</td>
+                          <td>
+                            {product.qty ? (
+                              <Form.Control
+                                type="number"
+                                value={product.qty}
+                                name="qty"
+                                style={{ maxWidth: "100px" }}
+                                onChange={(e: any) => {
+                                  handleProductQtyChange(
+                                    product,
+                                    e.target.value
+                                  );
+                                }}
+                              />
+                            ) : product.available ? (
+                              "available"
+                            ) : (
+                              "not available"
+                            )}
+                          </td>
+                          <td>
+                            <Button
+                              variant="primary"
+                              onClick={() => {
+                                handleDeleteProduct(product);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+                {formValues.products.length > 0 && (
+                  <Row>
+                    <Col>
+                      <h2>
+                        Sum:{" "}
+                        {formValues.products
+                          .map((product: any) =>
+                            typeof product.qty !== "undefined"
+                              ? product.price * product.qty
+                              : product.price
+                          )
+                          .reduce((a, b) => a + b, 0)
+                          .toFixed(2)}{" "}
+                        PLN
+                      </h2>
+                    </Col>
+                  </Row>
+                )}
+                {formValues.products.length === 0 && (
+                  <h5 className="text-center mt-2">Add products</h5>
+                )}
+              </Col>
+            </Row>
+            <Row>
+              <Col xs={{ span: 2, offset: 5 }}>
+                <Button
+                  variant="primary"
+                  style={{ width: "100%" }}
+                  onClick={() => setIsProductsModalOpen(true)}
+                >
+                  +
+                </Button>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+        <Button variant="primary" onClick={handleSubmit}>
           Submit
         </Button>
       </Form>
+
+      <Modal
+        show={isProductsModalOpen}
+        onHide={() => setIsProductsModalOpen(false)}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Products</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ padding: "0" }}>
+          <Table striped bordered hover style={{ marginBottom: "0" }}>
+            <thead>
+              <tr>
+                <th>name</th>
+                <th>price</th>
+                <th>qty/availability</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product: any) => {
+                const notAvailable =
+                  (typeof product.qty !== "undefined" && product.qty === 0) ||
+                  (typeof product.available !== "undefined" &&
+                    !product.available);
+                return (
+                  <tr
+                    key={`product-${product.id}`}
+                    style={{
+                      cursor: !notAvailable ? "pointer" : "not-allowed",
+                    }}
+                    onClick={() => {
+                      handleAddProduct(product);
+                    }}
+                  >
+                    <td>{product.name}</td>
+                    <td>{product.price} PLN</td>
+                    <td>
+                      {product.qty
+                        ? product.qty
+                        : product.available
+                        ? "available"
+                        : "not available"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };
 
-export default Orders;
+export default AddOrder;

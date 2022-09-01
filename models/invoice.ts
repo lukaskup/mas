@@ -6,5 +6,3 @@ export interface IInvoice {
   nip: number;
   payment?: IPayment;
 }
-
-export type InvoiceFormData = Omit<IInvoice, "id">;

@@ -1,5 +1,5 @@
 import { IPhysical, IService } from "./product";
-import { IPayment } from "./payment";
+import { IPayment, IPaymentFormValues } from "./payment";
 import { IClient } from "./person";
 
 export enum OrderStatus {
@@ -16,9 +16,14 @@ export interface IOrder {
   status: OrderStatus;
   createdAt: Date;
   completedAt: Date;
-  payment: IPayment | string;
-  products: (IPhysical | IService)[] | string[];
-  client: IClient;
+  payment: IPayment;
+  products: (IPhysical | IService)[];
+  client: IClient | null;
 }
 
-export type OrderFormValues = Omit<IOrder, "id">;
+export type OrderFormValues = Omit<
+  IOrder,
+  "id" | "createdAt" | "completedAt" | "status" | "payment" | "price"
+> & {
+  payment: IPaymentFormValues;
+};
