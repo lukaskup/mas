@@ -10,31 +10,6 @@ import Link from "next/link";
 
 const Orders: NextPage = () => {
   const [isOrdersLoading, setOrdersLoading] = useState(true);
-  const defaultValues: OrderFormValues = {
-    price: 0,
-    description: "",
-    status: OrderStatus.inProgress,
-    createdAt: new Date(),
-    completedAt: new Date(),
-    payment: "",
-    products: [],
-    client: null,
-  };
-
-  const [formValues, setFormValues] = useState(defaultValues);
-
-  const handleInputChange = (e: any) => {
-    const { name, value } = e.target;
-    setFormValues({
-      ...formValues,
-      [name]: value,
-    });
-  };
-
-  const handleSubmit = (event: any) => {
-    event.preventDefault();
-    console.log(formValues);
-  };
 
   useEffect(() => {
     const docRef = doc(db, "orders", "test");

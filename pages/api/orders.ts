@@ -41,10 +41,12 @@ export default function handler(
 
       dto.id = uuidv4();
       //TODO odejmij od stanów produdktu stany z zamówienia
-      // const docRef = doc(db, "orders", dto.id);
-      // setDoc(docRef, dto).then(() => {
-      //   res.status(200).send("success");
-      // });
+      //@ts-ignore
+      // db.__proto__ = Firestore.prototype;
+      const docRef = doc(db, "orders", dto.id);
+      setDoc(docRef, dto).then(() => {
+        res.status(200).send("success");
+      });
       break;
     case "PUT":
       return null;

@@ -9,12 +9,7 @@ import styles from "../styles/Home.module.css";
 
 const Home: NextPage = () => {
   const [isOrdersLoading, setOrdersLoading] = useState(true);
-  useEffect(() => {
-    const docRef = doc(db, "orders", "test");
-    getDoc(docRef).then((doc) => {
-      console.log(doc.data());
-    });
-  });
+
   return (
     <div className={styles.container}>
       <Head>

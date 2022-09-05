@@ -1,7 +1,13 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  Firestore,
+} from "firebase/firestore";
 import styles from "../../styles/Home.module.css";
 import { OrderFormValues, OrderStatus } from "../../models/order";
 import { Button, Col, Form, Modal, Row, Table } from "react-bootstrap";
@@ -108,7 +114,6 @@ const AddOrder: NextPage = () => {
   useEffect(() => {
     const productsQuery = query(collection(db, "products"));
     const clientsQuery = query(collection(db, "persons"), orderBy("email"));
-
     Promise.all([getDocs(productsQuery), getDocs(clientsQuery)]).then(
       (snapshots) => {
         const productsSnapshot = snapshots[0];
@@ -119,7 +124,6 @@ const AddOrder: NextPage = () => {
           dbProducts.push(dbProduct);
         });
         setProducts(dbProducts);
-
         const dbClients: IClient[] = [];
         clientsSnapshot.forEach((doc: any) => {
           let dbClient: IClient = doc.data();
